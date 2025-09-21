@@ -7,6 +7,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
 import Home from "./components/Home";
+import FamilyTree from "./components/FamilyTree";
+import FamilyMembersPage from "./components/FamilyMember";
 import NotFound from "./components/NotFound";
 import { API_URL, SOCKETS_URL, NODE_ENV } from "./shared";
 import { io } from "socket.io-client";
@@ -65,6 +67,8 @@ const App = () => {
           <Route path="/login" element={<Login setUser={setUser} />} />
           <Route path="/signup" element={<Signup setUser={setUser} />} />
           <Route exact path="/" element={<Home />} />
+          <Route path="/familytree" element={<FamilyTree />} />
+          <Route path="/familymembers" element={<FamilyMembersPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { API_URL } from "../shared";
-import "./AuthStyles.css";
+import "../styles/LoginStyles.css";
 
 const Login = ({ setUser }) => {
   const [formData, setFormData] = useState({
@@ -46,7 +46,7 @@ const Login = ({ setUser }) => {
       });
 
       setUser(response.data.user);
-      navigate("/");
+      navigate("/familytree");
     } catch (error) {
       if (error.response?.data?.error) {
         setErrors({ general: error.response.data.error });

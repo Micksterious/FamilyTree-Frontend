@@ -6,7 +6,7 @@ const NavBar = ({ user, onLogout }) => {
   return (
     <nav className="navbar">
       <div className="nav-brand">
-        <Link to="/">Capstone II</Link>
+        <Link to="/familytree">Capstone II</Link>
       </div>
 
       <div className="nav-links">
@@ -16,6 +16,9 @@ const NavBar = ({ user, onLogout }) => {
             <button onClick={onLogout} className="logout-btn">
               Logout
             </button>
+            <Link to="/familymembers" className="nav-link">
+              Family Members
+            </Link>
           </div>
         ) : (
           <div className="auth-links">
