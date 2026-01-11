@@ -1,11 +1,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import "./NavBarStyles.css";
+import "../styles/NavBarStyles.css";
 
 const NavBar = ({ user, onLogout }) => {
   return (
     <nav className="navbar">
       <div className="nav-brand">
+        <Link to="/" className="home-icon-link">🏠</Link>
         <Link to="/familytree" className="tree-link">🌳</Link>
         <Link to="/familymembers" className="nav-link">
           Family Members

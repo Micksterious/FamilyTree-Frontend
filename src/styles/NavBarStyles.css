@@ -23,8 +23,17 @@
   text-decoration: none;
 }
 
-.nav-brand a.tree-link {
-  font-size: 2rem;
+/* Home and Tree icons - bigger size with more specific selector */
+.nav-brand .home-icon-link,
+.nav-brand .tree-link {
+  font-size: 2rem !important;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.nav-brand .home-icon-link:hover,
+.nav-brand .tree-link:hover {
+  transform: scale(1.1);
 }
 
 .nav-brand a:hover {
@@ -79,4 +88,19 @@
 
 .logout-btn:hover {
   background-color: #c82333;
+}
+
+/* Admin button styling */
+.admin-btn {
+  background-color: #4CAF50;
+  color: white;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.admin-btn:hover {
+  background-color: #45a049;
 }
