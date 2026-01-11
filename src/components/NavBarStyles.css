@@ -10,11 +10,21 @@
   border-bottom: 1px solid #e9ecef;
 }
 
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .nav-brand a {
-  font-size: 1.5rem;
-  font-weight: bold;
+  font-size: 1rem;
+  font-weight: normal;
   color: #333;
   text-decoration: none;
+}
+
+.nav-brand a.tree-link {
+  font-size: 2rem;
 }
 
 .nav-brand a:hover {
