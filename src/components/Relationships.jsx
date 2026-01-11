@@ -13,11 +13,12 @@ const Relationships = () => {
   const [editRel, setEditRel] = useState(null);
   const navigate = useNavigate();
 
-  const token = localStorage.getItem('token'); // ← ADD THIS LINE
-
   useEffect(() => {
     const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      
       if (!token) {
+        alert("You must be logged in to view this page.");
         navigate("/login");
         return;
       }
@@ -28,24 +29,22 @@ const Relationships = () => {
         });
 
         if (!response.data) {
+          alert("You must be logged in to view this page.");
           navigate("/login");
           return;
         }
 
-        // Set user here too!
-        setUser(response.data); // ← ADD THIS
-
+        setUser(response.data);
         fetchData();
       } catch (err) {
         console.error("Auth error:", err);
+        alert("Your session has expired. Please log in again.");
         navigate("/login");
       }
     };
 
     checkAuth();
-  }, [navigate, token]);
-
-  // ... rest of your component
+  }, [navigate]);
 
   const fetchData = async () => {
     try {
@@ -204,7 +203,6 @@ const Relationships = () => {
               {getMemberName(rel.parent_id)} ➝ {getMemberName(rel.child_id)}
             </div>
             <div className="family-actions">
-              {console.log("Button check - user:", user, "role:", user?.role, "equals admin?", user?.role === "admin")}
               {user?.role === "admin" && (
                 <>
                   <button

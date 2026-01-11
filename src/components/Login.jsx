@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { API_URL } from "../shared";
-import "../styles/LoginStyles.css";
+import "../styles/AuthStyles.css";  // Instead of LoginStyles.css
 
 const Login = ({ setUser }) => {
   const [formData, setFormData] = useState({

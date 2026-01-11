@@ -12,6 +12,7 @@ function FamilyTree() {
       const token = localStorage.getItem('token');
       
       if (!token) {
+        alert("You must be logged in to view this page.");
         navigate("/login");
         return;
       }
@@ -22,10 +23,13 @@ function FamilyTree() {
         });
         
         if (!response.data) {
+          alert("You must be logged in to view this page.");
           navigate("/login");
+          return;
         }
       } catch (error) {
         console.error("Auth check failed:", error);
+        alert("Your session has expired. Please log in again.");
         navigate("/login");
       }
     };

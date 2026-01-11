@@ -96,3 +96,61 @@
   margin: 0 auto;
   padding: 0 1rem;
 }
+/* Search and Filter Section */
+.search-filter-section {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.6rem 1rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #4a90e2;
+}
+
+.filter-select {
+  padding: 0.6rem 1rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: white;
+  cursor: pointer;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #4a90e2;
+}
+
+.filter-info {
+  color: #666;
+  font-size: 0.9rem;
+  margin-left: auto;
+}
+
+.age-badge {
+  background: #e8f4f8;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #4a90e2;
+  margin-left: 0.5rem;
+}
+
+.no-results {
+  text-align: center;
+  padding: 2rem;
+  color: #999;
+  font-style: italic;
+}
