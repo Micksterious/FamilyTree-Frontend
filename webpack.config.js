@@ -14,8 +14,8 @@ module.exports = {
   plugins: [
     new webpack.EnvironmentPlugin({
       NODE_ENV: "development",
-      API_URL: "http://localhost:8080",
-      SOCKETS_URL: "ws://localhost:8080",
+      REACT_APP_API_URL: "http://localhost:8080",
+      REACT_APP_SOCKETS_URL: "ws://localhost:8080",
       REACT_APP_AUTH0_DOMAIN: "",
       REACT_APP_AUTH0_CLIENT_ID: "",
       REACT_APP_AUTH0_AUDIENCE: "",
