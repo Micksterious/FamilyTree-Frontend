@@ -16,6 +16,7 @@ function FamilyMembersPage() {
 
   const token = localStorage.getItem("token");
   const [user, setUser] = useState(null);
+  const [countdown, setCountdown] = useState(null);
 
   const fetchMembers = async () => {
     try {
@@ -32,8 +33,8 @@ function FamilyMembersPage() {
     const fetchUser = async () => {
       try {
         const res = await axios.get(`${API_URL}/auth/me`, {
-  headers: { Authorization: `Bearer ${token}` },
-});
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setUser(res.data);
       } catch (err) {
         console.error("Error fetching user:", err);
@@ -106,30 +107,39 @@ function FamilyMembersPage() {
   };
   // Function to get Next Birthday
   function getNextBirthday(members) {
-    const today = new Date();
+    const now = new Date();
     let closest = null;
     let minDiff = Infinity;
 
     members.forEach((member) => {
-      const dob = new Date(member.date_of_birth);
-      const thisYear = new Date(
-        today.getFullYear(),
-        dob.getMonth(),
-        dob.getDate()
+      if (!member.date_of_birth) return;
+
+      const [year, month, day] = member.date_of_birth.split("-").map(Number);
+
+      // Create birthday at LOCAL noon (timezone-safe)
+      let nextBirthday = new Date(
+        now.getFullYear(),
+        month - 1,
+        day,
+        12, 0, 0
       );
 
-      // If birthday already passed this year, use next year
-      const nextBirthday =
-        thisYear < today
-          ? new Date(today.getFullYear() + 1, dob.getMonth(), dob.getDate())
-          : thisYear;
+      if (nextBirthday < now) {
+        nextBirthday = new Date(
+          now.getFullYear() + 1,
+          month - 1,
+          day,
+          12, 0, 0
+        );
+      }
 
-      const diff = nextBirthday - today;
+      const diff = nextBirthday - now;
+
       if (diff < minDiff) {
         minDiff = diff;
         closest = {
           ...member,
-          daysUntil: Math.ceil(diff / (1000 * 60 * 60 * 24)),
+          nextBirthday,
         };
       }
     });
@@ -139,113 +149,149 @@ function FamilyMembersPage() {
 
   const nextBirthday = getNextBirthday(members);
 
+  useEffect(() => {
+    if (!nextBirthday?.nextBirthday) return;
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      let diff = nextBirthday.nextBirthday - now;
+
+      if (diff <= 0) {
+        clearInterval(interval);
+        setCountdown("🎉 Today!");
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      diff %= 1000 * 60 * 60 * 24;
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      diff %= 1000 * 60 * 60;
+
+      const minutes = Math.floor(diff / (1000 * 60));
+      diff %= 1000 * 60;
+
+      const seconds = Math.floor(diff / 1000);
+
+      setCountdown({ days, hours, minutes, seconds });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [nextBirthday]);
+
+
   return (
     <>
       <div className="family-container">
-        {nextBirthday && (
-          <div className="next-birthday">
-            🎉 Next birthday: {nextBirthday.firstname} {nextBirthday.lastname} —
-            in {nextBirthday.daysUntil} day(s)!
+        {nextBirthday && countdown && (
+          <div className="next-birthday" style={{ whiteSpace: 'nowrap' }}>
+            🎉 Next birthday: {nextBirthday.firstname} {nextBirthday.lastname} — ⏳
+            {typeof countdown === "string" ? (
+              ` ${countdown}`
+            ) : (
+              ` ${countdown.days} days ${countdown.hours} hours ${countdown.minutes} mins ${countdown.seconds} seconds`
+            )}
           </div>
         )}
-        <h2>Family Members</h2>
 
-        {/* Create Form */}
-        <form className="family-form" onSubmit={handleCreate}>
+      <h2>Family Members</h2>
+
+      {/* Create Form */}
+      <form className="family-form" onSubmit={handleCreate}>
+        <input
+          name="firstname"
+          placeholder="First Name"
+          value={formData.firstname}
+          onChange={handleChange}
+        />
+        <input
+          name="lastname"
+          placeholder="Last Name"
+          value={formData.lastname}
+          onChange={handleChange}
+        />
+        <input
+          name="date_of_birth"
+          type="date"
+          value={formData.date_of_birth}
+          onChange={handleChange}
+        />
+        <select name="sex" value={formData.sex} onChange={handleChange}>
+          <option value="">Select Sex</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+        <button type="submit">Add Member</button>
+      </form>
+
+      {/* Edit Form */}
+      {editMember && (
+        <form className="family-form" onSubmit={handleUpdate}>
+          <h3>
+            Editing: {editMember.firstname} {editMember.lastname}
+          </h3>
           <input
             name="firstname"
-            placeholder="First Name"
-            value={formData.firstname}
-            onChange={handleChange}
+            value={editMember.firstname}
+            onChange={handleEditChange}
           />
           <input
             name="lastname"
-            placeholder="Last Name"
-            value={formData.lastname}
-            onChange={handleChange}
+            value={editMember.lastname}
+            onChange={handleEditChange}
           />
           <input
-            name="date_of_birth"
             type="date"
-            value={formData.date_of_birth}
-            onChange={handleChange}
+            name="date_of_birth"
+            value={editMember.date_of_birth?.slice(0, 10)}
+            onChange={handleEditChange}
           />
-          <select name="sex" value={formData.sex} onChange={handleChange}>
-            <option value="">Select Sex</option>
+          <select
+            name="sex"
+            value={editMember.sex}
+            onChange={handleEditChange}
+          >
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
-          <button type="submit">Add Member</button>
+          <button type="submit">Update Member</button>
+          <button type="button" onClick={() => setEditMember(null)}>
+            Cancel
+          </button>
         </form>
+      )}
 
-        {/* Edit Form */}
-        {editMember && (
-          <form className="family-form" onSubmit={handleUpdate}>
-            <h3>
-              Editing: {editMember.firstname} {editMember.lastname}
-            </h3>
-            <input
-              name="firstname"
-              value={editMember.firstname}
-              onChange={handleEditChange}
-            />
-            <input
-              name="lastname"
-              value={editMember.lastname}
-              onChange={handleEditChange}
-            />
-            <input
-              type="date"
-              name="date_of_birth"
-              value={editMember.date_of_birth?.slice(0, 10)}
-              onChange={handleEditChange}
-            />
-            <select
-              name="sex"
-              value={editMember.sex}
-              onChange={handleEditChange}
-            >
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-            </select>
-            <button type="submit">Update Member</button>
-            <button type="button" onClick={() => setEditMember(null)}>
-              Cancel
-            </button>
-          </form>
-        )}
-
-        {/* Member List */}
-        <ul className="family-list">
-          {members.map((m) => (
-            <li key={m.id} className="family-item">
-              <div className="family-info">
-                {m.firstname} {m.lastname} ({m.sex}) —{" "}
-                {new Date(m.date_of_birth).toLocaleDateString()}
-              </div>
-              <div className="family-actions">
+      {/* Member List */}
+      <ul className="family-list">
+        {members.map((m) => (
+          <li key={m.id} className="family-item">
+            <div className="family-info">
+              {m.firstname} {m.lastname} ({m.sex}) — {" "}
+              {new Date(m.date_of_birth).toLocaleDateString('en-US', { timeZone: 'UTC' })}
+            </div>
+            <div className="family-actions">
               {console.log("Button check - user:", user, "role:", user?.role, "equals admin?", user?.role === "admin")}
-                {user?.role === "admin" && (
-                  <>
-                    <button
-                      className="edit-btn"
-                      onClick={() => handleEditClick(m)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="delete-btn"
-                      onClick={() => handleDelete(m.id)}
-                    >
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+              {user?.role === "admin" && (
+                <>
+                  <button
+                    className="edit-btn"
+                    onClick={() => handleEditClick(m)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="delete-btn"
+                    onClick={() => handleDelete(m.id)}
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
     </>
   );
 }

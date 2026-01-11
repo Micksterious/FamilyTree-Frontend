@@ -13,7 +13,7 @@ const Relationships = () => {
   const [editRel, setEditRel] = useState(null);
   const navigate = useNavigate();
 
-    const token = localStorage.getItem('token'); // ← ADD THIS LINE
+  const token = localStorage.getItem('token'); // ← ADD THIS LINE
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -26,7 +26,7 @@ const Relationships = () => {
         const response = await axios.get(`${API_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        
+
         if (!response.data) {
           navigate("/login");
           return;
@@ -204,29 +204,29 @@ const Relationships = () => {
               {getMemberName(rel.parent_id)} ➝ {getMemberName(rel.child_id)}
             </div>
             <div className="family-actions">
-  {console.log("Button check - user:", user, "role:", user?.role, "equals admin?", user?.role === "admin")}
-  {user?.role === "admin" && (
-    <>
-      <button
-        className="edit-btn"
-        onClick={() =>
-          setEditRel({
-            parent_id: rel.parent_id,
-            child_id: rel.child_id,
-          })
-        }
-      >
-        Edit
-      </button>
-      <button
-        className="delete-btn"
-        onClick={() => handleDelete(rel.parent_id, rel.child_id)}
-      >
-        Delete
-      </button>
-    </>
-  )}
-</div>
+              {console.log("Button check - user:", user, "role:", user?.role, "equals admin?", user?.role === "admin")}
+              {user?.role === "admin" && (
+                <>
+                  <button
+                    className="edit-btn"
+                    onClick={() =>
+                      setEditRel({
+                        parent_id: rel.parent_id,
+                        child_id: rel.child_id,
+                      })
+                    }
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="delete-btn"
+                    onClick={() => handleDelete(rel.parent_id, rel.child_id)}
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
           </li>
         ))}
       </ul>
