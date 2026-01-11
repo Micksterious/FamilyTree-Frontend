@@ -8,13 +8,14 @@ const Relationships = () => {
   const [relationships, setRelationships] = useState([]);
   const [familyMembers, setFamilyMembers] = useState([]);
   const [formData, setFormData] = useState({ parent_id: "", child_id: "" });
+  const [user, setUser] = useState(null);
   const [editRel, setEditRel] = useState(null);
   const navigate = useNavigate();
 
+    const token = localStorage.getItem('token'); // ← ADD THIS LINE
+
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      
       if (!token) {
         navigate("/login");
         return;
@@ -30,6 +31,9 @@ const Relationships = () => {
           return;
         }
 
+        // Set user here too!
+        setUser(response.data); // ← ADD THIS
+
         fetchData();
       } catch (err) {
         console.error("Auth error:", err);
@@ -38,7 +42,7 @@ const Relationships = () => {
     };
 
     checkAuth();
-  }, [navigate]);
+  }, [navigate, token]);
 
   // ... rest of your component
 
@@ -199,24 +203,29 @@ const Relationships = () => {
               {getMemberName(rel.parent_id)} ➝ {getMemberName(rel.child_id)}
             </div>
             <div className="family-actions">
-              <button
-                className="edit-btn"
-                onClick={() =>
-                  setEditRel({
-                    parent_id: rel.parent_id,
-                    child_id: rel.child_id,
-                  })
-                }
-              >
-                Edit
-              </button>
-              <button
-                className="delete-btn"
-                onClick={() => handleDelete(rel.parent_id, rel.child_id)}
-              >
-                Delete
-              </button>
-            </div>
+  {console.log("Button check - user:", user, "role:", user?.role, "equals admin?", user?.role === "admin")}
+  {user?.role === "admin" && (
+    <>
+      <button
+        className="edit-btn"
+        onClick={() =>
+          setEditRel({
+            parent_id: rel.parent_id,
+            child_id: rel.child_id,
+          })
+        }
+      >
+        Edit
+      </button>
+      <button
+        className="delete-btn"
+        onClick={() => handleDelete(rel.parent_id, rel.child_id)}
+      >
+        Delete
+      </button>
+    </>
+  )}
+</div>
           </li>
         ))}
       </ul>
