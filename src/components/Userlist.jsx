@@ -22,7 +22,7 @@ function Userlist() {
         const res = await axios.get(`${API_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        
+
         if (res.data.role !== 'admin') {
           alert("Access denied - Admin only");
           navigate("/");
@@ -40,7 +40,8 @@ function Userlist() {
       const res = await axios.get(`${API_URL}/api/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
+      console.log("Fetching from:", `${API_URL}/api/users`);
       if (Array.isArray(res.data)) {
         setUsers(res.data);
       } else {
