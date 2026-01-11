@@ -28,16 +28,26 @@ const App = () => {
   }, []);
 
   const checkAuth = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/auth/me`, {
-        withCredentials: true,
-      });
-      setUser(response.data.user);
-    } catch {
-      console.log("Not authenticated");
-      setUser(null);
-    }
-  };
+  const token = localStorage.getItem('token');
+  
+  if (!token) {
+    console.log("No token found");
+    setUser(null);
+    return;
+  }
+
+  try {
+    const response = await axios.get(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    console.log("✅ Auth check response:", response.data);
+    setUser(response.data); // Not response.data.user - your backend returns the user directly
+  } catch (error) {
+    console.log("❌ Auth check failed:", error);
+    setUser(null);
+    localStorage.removeItem('token'); // Clear invalid token
+  }
+};
 
   // Check authentication status on app load
   useEffect(() => {
@@ -45,20 +55,17 @@ const App = () => {
   }, []);
 
   const handleLogout = async () => {
-    try {
-      // Logout from our backend
-      await axios.post(
-        `${API_URL}/auth/logout`,
-        {},
-        {
-          withCredentials: true,
-        }
-      );
-      setUser(null);
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
-  };
+  try {
+    localStorage.removeItem('token');
+    setUser(null);
+    // Optional: call backend logout if you have one
+    await axios.post(`${API_URL}/auth/logout`, {}, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+};
 
   return (
     <div>

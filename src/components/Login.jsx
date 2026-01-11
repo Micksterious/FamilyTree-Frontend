@@ -33,30 +33,36 @@ const Login = ({ setUser }) => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!validateForm()) {
-      return;
+  if (!validateForm()) {
+    return;
+  }
+
+  setIsLoading(true);
+  try {
+    const response = await axios.post(`${API_URL}/auth/login`, formData, {
+      withCredentials: true,
+    });
+
+    // ADD THESE LINES:
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
+      console.log("✅ Token saved to localStorage");
     }
 
-    setIsLoading(true);
-    try {
-      const response = await axios.post(`${API_URL}/auth/login`, formData, {
-        withCredentials: true,
-      });
-
-      setUser(response.data.user);
-      navigate("/familytree");
-    } catch (error) {
-      if (error.response?.data?.error) {
-        setErrors({ general: error.response.data.error });
-      } else {
-        setErrors({ general: "An error occurred during login" });
-      }
-    } finally {
-      setIsLoading(false);
+    setUser(response.data.user);
+    navigate("/familytree");
+  } catch (error) {
+    if (error.response?.data?.error) {
+      setErrors({ general: error.response.data.error });
+    } else {
+      setErrors({ general: "An error occurred during login" });
     }
-  };
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleChange = (e) => {
     const { name, value } = e.target;

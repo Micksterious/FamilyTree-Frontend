@@ -13,11 +13,19 @@ const Relationships = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
       try {
-        const me = await axios.get(`${API_URL}/auth/me`, {
-          withCredentials: true,
+        const response = await axios.get(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
         });
-        if (!me.data?.user) {
+        
+        if (!response.data) {
           navigate("/login");
           return;
         }
@@ -31,6 +39,8 @@ const Relationships = () => {
 
     checkAuth();
   }, [navigate]);
+
+  // ... rest of your component
 
   const fetchData = async () => {
     try {

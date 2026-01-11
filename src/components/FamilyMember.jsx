@@ -31,9 +31,9 @@ function FamilyMembersPage() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/users/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await axios.get(`${API_URL}/auth/me`, {
+  headers: { Authorization: `Bearer ${token}` },
+});
         setUser(res.data);
       } catch (err) {
         console.error("Error fetching user:", err);
@@ -233,6 +233,7 @@ function FamilyMembersPage() {
                 {new Date(m.date_of_birth).toLocaleDateString()}
               </div>
               <div className="family-actions">
+              {console.log("Button check - user:", user, "role:", user?.role, "equals admin?", user?.role === "admin")}
                 {user?.role === "admin" && (
                   <>
                     <button
