@@ -18,7 +18,14 @@ const NavBar = ({ user, onLogout }) => {
       <div className="nav-links">
         {user ? (
           <div className="user-section">
+            {/* Admin button next to welcome */}
+            {user?.role === "admin" && (
+              <Link to="/userlist" className="admin-btn">
+                User Management
+              </Link>
+            )}
             <span className="username">Welcome, {user.username}!</span>
+            
             <button onClick={onLogout} className="logout-btn">
               Logout
             </button>

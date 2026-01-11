@@ -143,16 +143,7 @@ function FamilyMembersPage() {
     <>
       <div className="family-container">
         {nextBirthday && (
-          <div
-            style={{
-              background: "#f0f9e8",
-              border: "1px solid #c3e6cb",
-              padding: "10px",
-              borderRadius: "8px",
-              marginBottom: "20px",
-              fontWeight: "bold",
-            }}
-          >
+          <div className="next-birthday">
             🎉 Next birthday: {nextBirthday.firstname} {nextBirthday.lastname} —
             in {nextBirthday.daysUntil} day(s)!
           </div>

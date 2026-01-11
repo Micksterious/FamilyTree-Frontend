@@ -10,6 +10,7 @@ import Home from "./components/Home";
 import FamilyTree from "./components/FamilyTree";
 import FamilyMembersPage from "./components/FamilyMember";
 import Relationships from "./components/Relationships";
+import Userlist from "./components/Userlist";
 import NotFound from "./components/NotFound";
 import { API_URL, SOCKETS_URL, NODE_ENV } from "./shared";
 import { io } from "socket.io-client";
@@ -78,6 +79,7 @@ const App = () => {
           <Route path="/familytree" element={<FamilyTree />} />
           <Route path="/familymembers" element={<FamilyMembersPage />} />
           <Route path="/relationships" element={<Relationships />} />
+          <Route path="/userlist" element={<Userlist />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
