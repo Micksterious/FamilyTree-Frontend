@@ -25,7 +25,9 @@ const NavBar = ({ user, onLogout }) => {
                 User Management
               </Link>
             )}
-            <span className="username">Welcome, {user.username}!</span>
+            <span className="username">
+              Welcome, <Link to="/profile" className="profile-link">{user.username}</Link>!
+            </span>
             
             <button onClick={onLogout} className="logout-btn">
               Logout

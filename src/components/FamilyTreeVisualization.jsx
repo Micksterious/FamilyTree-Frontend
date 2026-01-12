@@ -17,25 +17,24 @@ const FamilyTreeVisualization = () => {
   // Helper function to format dates
   const formatDate = (dateString) => {
     if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    const [year, month, day] = dateString.split('T')[0].split('-');
+    const date = new Date(year, month - 1, day);
+    const monthName = date.toLocaleDateString("en-US", { month: "short" });
+    return `${monthName} ${day}, ${year}`;
   };
 
   // Helper function to create label with dates
-  const createLabel = (name, birthDate, deathDate) => {
-    let label = name;
+  const createLabel = (firstname, lastname, birthDate, deathDate) => {
+    let label = `${firstname} ${lastname}`;
+    
     if (birthDate) {
-      const birth = formatDate(birthDate);
-      label += `\nb. ${birth}`;
+      label += `\nb. ${formatDate(birthDate)}`;
     }
+    
     if (deathDate) {
-      const death = formatDate(deathDate);
-      label += `\nd. ${death}`;
+      label += `\nd. ${formatDate(deathDate)}`;
     }
+    
     return label;
   };
 
@@ -52,16 +51,30 @@ const FamilyTreeVisualization = () => {
           data: {
             ...node.data,
             label: createLabel(
-              node.data.label || node.data.name,
+              node.data.firstname,
+              node.data.lastname,
               node.data.birthDate,
               node.data.deathDate
             ),
-            birthDate: node.data.birthDate,
-            deathDate: node.data.deathDate,
           }
         }));
 
-        setElements([...processedNodes, ...response.data.edges]);
+        // Sort nodes by birth date to help dagre layout
+        processedNodes.sort((a, b) => {
+          const dateA = a.data.birthDate ? new Date(a.data.birthDate) : new Date('9999-12-31');
+          const dateB = b.data.birthDate ? new Date(b.data.birthDate) : new Date('9999-12-31');
+          return dateA - dateB;
+        });
+
+        // Sort edges to match the node order
+        const nodeOrder = processedNodes.map(n => n.data.id);
+        const sortedEdges = response.data.edges.sort((a, b) => {
+          const aTargetIndex = nodeOrder.indexOf(a.data.target);
+          const bTargetIndex = nodeOrder.indexOf(b.data.target);
+          return aTargetIndex - bTargetIndex;
+        });
+
+        setElements([...processedNodes, ...sortedEdges]);
         setLoading(false);
       } catch (err) {
         console.error("Error fetching family tree:", err);
@@ -72,22 +85,6 @@ const FamilyTreeVisualization = () => {
 
     fetchFamilyTree();
   }, []);
-
-  // Custom sorting function for dagre layout
-  const handleCyReady = (cy) => {
-    // Sort siblings by birth date before layout
-    cy.nodes().forEach((node) => {
-      const parent = node.parent();
-      if (parent.length > 0) {
-        const siblings = parent.children();
-        siblings.sort((a, b) => {
-          const dateA = a.data("birthDate") ? new Date(a.data("birthDate")) : new Date("9999-12-31");
-          const dateB = b.data("birthDate") ? new Date(b.data("birthDate")) : new Date("9999-12-31");
-          return dateA - dateB; // oldest to youngest (left to right)
-        });
-      }
-    });
-  };
 
   if (loading) return <div className="tree-container">Loading family tree...</div>;
   if (error) return <div className="tree-container error">{error}</div>;
@@ -103,14 +100,15 @@ const FamilyTreeVisualization = () => {
           return "#90E24A";
         },
         label: "data(label)",
-        width: 80,
-        height: 80,
+        width: 90,
+        height: 90,
         "text-valign": "center",
         "text-halign": "center",
-        "font-size": 10,
+        "font-size": 9,
         color: "#ffffff",
         "text-wrap": "wrap",
-        "text-max-width": 75,
+        "text-max-width": 85,
+        "font-weight": "normal",
       },
     },
     {
@@ -126,11 +124,10 @@ const FamilyTreeVisualization = () => {
 
   const layout = {
     name: "dagre",
-    nodeSep: 100,
+    nodeSep: 120,
     rankSep: 180,
     rankDir: "TB",
-    // Custom ranker to sort siblings by birth date
-    ranker: "tight-tree",
+    ranker: "network-simplex", // Changed from tight-tree
   };
 
   return (
@@ -144,7 +141,6 @@ const FamilyTreeVisualization = () => {
           }}
           stylesheet={cytoStyle}
           layout={layout}
-          cy={(cy) => handleCyReady(cy)}
         />
       ) : (
         <div>No family members to display</div>

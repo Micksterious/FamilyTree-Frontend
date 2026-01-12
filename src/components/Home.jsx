@@ -6,7 +6,7 @@ const Home = () => {
     <div className="home-container">
       <div className="home-content">
         <h1 className="home-title">My Family Tree!</h1>
-        <p className="home-subtitle">Discover, Connect, and Preserve Your Family Legacy</p>
+        <p className="home-subtitle">Discover, Connect, and Preserve Our Family Legacy</p>
         
         {/* SVG Family Tree Illustration */}
         <svg className="family-tree-svg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">

@@ -4,13 +4,16 @@ import { useNavigate } from "react-router-dom";
 import { API_URL } from "../shared";
 import NavBar from "./NavBar";
 import "../styles/FamilyMembers.css";
+import "../styles/Relationships.css";
 
 const Relationships = () => {
   const [relationships, setRelationships] = useState([]);
   const [familyMembers, setFamilyMembers] = useState([]);
-  const [formData, setFormData] = useState({ parent_id: "", child_id: "" });
+  const [formData, setFormData] = useState({ parent_ids: [], child_ids: [] });
   const [user, setUser] = useState(null);
   const [editRel, setEditRel] = useState(null);
+  const [parentSearch, setParentSearch] = useState("");
+  const [childSearch, setChildSearch] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,25 +67,80 @@ const Relationships = () => {
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleParentChange = (parentId) => {
+    const currentIds = formData.parent_ids;
+    if (currentIds.includes(parentId)) {
+      setFormData({
+        ...formData,
+        parent_ids: currentIds.filter(id => id !== parentId),
+        child_ids: []
+      });
+    } else {
+      setFormData({
+        ...formData,
+        parent_ids: [parentId], // Only allow one parent at a time
+        child_ids: []
+      });
+    }
+  };
+
+  const handleChildCheckbox = (childId) => {
+    const currentIds = formData.child_ids;
+    if (currentIds.includes(childId)) {
+      setFormData({
+        ...formData,
+        child_ids: currentIds.filter(id => id !== childId)
+      });
+    } else {
+      setFormData({
+        ...formData,
+        child_ids: [...currentIds, childId]
+      });
+    }
+  };
+
+  const handleSelectAll = () => {
+    const availableFiltered = filteredChildren.map(m => m.id.toString());
+    
+    if (formData.child_ids.length === availableFiltered.length) {
+      setFormData({ ...formData, child_ids: [] });
+    } else {
+      setFormData({ ...formData, child_ids: availableFiltered });
+    }
   };
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (formData.parent_id === formData.child_id) {
-      alert("Parent and child can't be the same.");
+    
+    if (formData.parent_ids.length === 0) {
+      alert("Please select a parent.");
       return;
     }
 
+    if (formData.child_ids.length === 0) {
+      alert("Please select at least one child.");
+      return;
+    }
+
+    const parentId = formData.parent_ids[0];
+
     try {
-      await axios.post(`${API_URL}/api/relationships`, formData, {
-        withCredentials: true,
-      });
-      setFormData({ parent_id: "", child_id: "" });
+      await Promise.all(
+        formData.child_ids.map(child_id =>
+          axios.post(
+            `${API_URL}/api/relationships`, 
+            { parent_id: parentId, child_id }, 
+            { withCredentials: true }
+          )
+        )
+      );
+      
+      alert(`Successfully added ${formData.child_ids.length} relationship(s)!`);
+      setFormData({ parent_ids: [], child_ids: [] });
       fetchData();
     } catch (err) {
       console.error("Create error:", err);
+      alert("Error creating relationships. Some may already exist.");
     }
   };
 
@@ -132,36 +190,130 @@ const Relationships = () => {
     return member ? `${member.firstname} ${member.lastname}` : `Unknown`;
   };
 
+  const availableChildren = familyMembers.filter(
+    m => !formData.parent_ids.includes(m.id.toString())
+  );
+
+  // Filter parents by search
+  const filteredParents = familyMembers.filter(m => {
+    const fullName = `${m.firstname} ${m.lastname}`.toLowerCase();
+    return fullName.includes(parentSearch.toLowerCase());
+  });
+
+  // Filter children by search
+  const filteredChildren = availableChildren.filter(m => {
+    const fullName = `${m.firstname} ${m.lastname}`.toLowerCase();
+    return fullName.includes(childSearch.toLowerCase());
+  });
+
   return (
     <div className="family-container">
       <h2>Relationships</h2>
 
       {/* Create Relationship Form */}
-      <form onSubmit={handleCreate} className="family-form">
-        <select name="parent_id" value={formData.parent_id} onChange={handleChange}>
-          <option value="">Select Parent</option>
-          {familyMembers.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.firstname} {m.lastname}
-            </option>
-          ))}
-        </select>
+      <form onSubmit={handleCreate} className="relationship-form">
+        <div className="form-row">
+          <div className="form-column">
+            <div className="checkbox-header">
+              <label>Select Parent ({formData.parent_ids.length} selected)</label>
+            </div>
 
-        <select name="child_id" value={formData.child_id} onChange={handleChange}>
-          <option value="">Select Child</option>
-          {familyMembers.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.firstname} {m.lastname}
-            </option>
-          ))}
-        </select>
+            <input
+              type="text"
+              className="search-input-small"
+              placeholder="🔍 Search parents..."
+              value={parentSearch}
+              onChange={(e) => setParentSearch(e.target.value)}
+            />
+            
+            <div className="checkbox-container">
+              {filteredParents.length === 0 ? (
+                <div className="checkbox-placeholder">
+                  {parentSearch ? 'No matches found' : 'No family members available'}
+                </div>
+              ) : (
+                filteredParents.map((m) => (
+                  <label key={m.id} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      value={m.id}
+                      checked={formData.parent_ids.includes(m.id.toString())}
+                      onChange={() => handleParentChange(m.id.toString())}
+                    />
+                    <span className="checkbox-label">
+                      {m.firstname} {m.lastname}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
 
-        <button type="submit">Add Relationship</button>
+          <div className="form-column">
+            <div className="checkbox-header">
+              <label>Select Children ({formData.child_ids.length} selected)</label>
+              {formData.parent_ids.length > 0 && filteredChildren.length > 0 && (
+                <button 
+                  type="button" 
+                  className="select-all-btn"
+                  onClick={handleSelectAll}
+                >
+                  {formData.child_ids.length === filteredChildren.length ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
+            </div>
+
+            <input
+              type="text"
+              className="search-input-small"
+              placeholder="🔍 Search children..."
+              value={childSearch}
+              onChange={(e) => setChildSearch(e.target.value)}
+            />
+            
+            <div className="checkbox-container">
+              {formData.parent_ids.length === 0 ? (
+                <div className="checkbox-placeholder">
+                  Please select a parent first
+                </div>
+              ) : filteredChildren.length === 0 ? (
+                <div className="checkbox-placeholder">
+                  {childSearch ? 'No matches found' : 'No other family members available'}
+                </div>
+              ) : (
+                filteredChildren.map((m) => (
+                  <label key={m.id} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      value={m.id}
+                      checked={formData.child_ids.includes(m.id.toString())}
+                      onChange={() => handleChildCheckbox(m.id.toString())}
+                    />
+                    <span className="checkbox-label">
+                      {m.firstname} {m.lastname}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        <button 
+          type="submit" 
+          className="submit-btn"
+          disabled={formData.parent_ids.length === 0 || formData.child_ids.length === 0}
+        >
+          Add {formData.child_ids.length > 0 ? formData.child_ids.length : ''} Relationship{formData.child_ids.length !== 1 ? 's' : ''}
+        </button>
       </form>
 
       {/* Edit Relationship Form */}
       {editRel && (
         <form onSubmit={handleUpdate} className="family-form">
+          <h3 style={{ width: '100%', marginBottom: '10px' }}>
+            Edit Relationship
+          </h3>
           <select
             value={editRel.new_parent_id || editRel.parent_id}
             onChange={(e) =>
