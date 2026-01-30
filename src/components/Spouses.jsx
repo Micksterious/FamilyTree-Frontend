@@ -91,8 +91,6 @@ const Spouses = () => {
         );
       }
       setFormData({ partner1_id: "", partner2_id: "" });
-      setPartner1Search("");
-      setPartner2Search("");
       fetchData();
     } catch (err) {
       console.error("Error saving spouse relationship:", err);

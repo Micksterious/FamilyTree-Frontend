@@ -14,9 +14,6 @@ const NavBar = ({ user, onLogout }) => {
         <Link to="/relationships" className="nav-link">
           Relationships
         </Link>
-        <Link to="/spouses" className="nav-link">
-          Spouses
-        </Link>
       </div>
 
       <div className="nav-links">

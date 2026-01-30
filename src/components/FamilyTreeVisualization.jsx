@@ -13,6 +13,8 @@ const FamilyTreeVisualization = () => {
   const [elements, setElements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showParentChild, setShowParentChild] = useState(true);
+  const [showSpouses, setShowSpouses] = useState(true);
 
   const formatDate = (dateString) => {
     if (!dateString) return "";
@@ -210,6 +212,13 @@ const FamilyTreeVisualization = () => {
     },
   ];
 
+  // Filter elements based on visibility toggles
+  const filteredElements = elements.filter(el => {
+    if (el.data?.type === "parent-child" && !showParentChild) return false;
+    if (el.data?.type === "spouse" && !showSpouses) return false;
+    return true;
+  });
+
   return (
     <div className="tree-container">
       {/* Legend */}
@@ -227,6 +236,12 @@ const FamilyTreeVisualization = () => {
       }}>
         <div style={{ fontWeight: "bold", marginBottom: "10px" }}>Legend</div>
         <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "10px" }}>
+          <input
+            type="checkbox"
+            checked={showParentChild}
+            onChange={(e) => setShowParentChild(e.target.checked)}
+            style={{ cursor: "pointer" }}
+          />
           <div style={{ width: "30px", height: "2px", backgroundColor: "#333", position: "relative" }}>
             <div style={{ 
               position: "absolute", 
@@ -243,6 +258,12 @@ const FamilyTreeVisualization = () => {
           <span>Parent-Child</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <input
+            type="checkbox"
+            checked={showSpouses}
+            onChange={(e) => setShowSpouses(e.target.checked)}
+            style={{ cursor: "pointer" }}
+          />
           <div style={{ width: "30px", height: "3px", backgroundColor: "#E84C9F", backgroundImage: "repeating-linear-gradient(90deg, #E84C9F 0px, #E84C9F 5px, white 5px, white 10px)" }} />
           <span>Spouse</span>
         </div>
@@ -250,7 +271,7 @@ const FamilyTreeVisualization = () => {
 
       {elements.length > 0 ? (
         <CytoscapeComponent
-          elements={elements}
+          elements={filteredElements}
           style={{
             width: "100%",
             height: "calc(100vh - 80px)",
