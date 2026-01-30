@@ -12,13 +12,10 @@ module.exports = {
   },
   devtool: "source-map",
   plugins: [
-    new webpack.EnvironmentPlugin({
-      NODE_ENV: "development",
-      REACT_APP_API_URL: "http://localhost:8080",
-      REACT_APP_SOCKETS_URL: "ws://localhost:8080",
-      REACT_APP_AUTH0_DOMAIN: "",
-      REACT_APP_AUTH0_CLIENT_ID: "",
-      REACT_APP_AUTH0_AUDIENCE: "",
+    new webpack.DefinePlugin({
+      'process.env.REACT_APP_API_URL': JSON.stringify(process.env.REACT_APP_API_URL || "https://capstone-2-backend-chi.vercel.app"),
+      'process.env.REACT_APP_SOCKETS_URL': JSON.stringify(process.env.REACT_APP_SOCKETS_URL || "wss://capstone-2-backend-chi.vercel.app"),
+      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || "development"),
     }),
   ],
   module: {

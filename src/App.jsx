@@ -10,6 +10,7 @@ import Home from "./components/Home";
 import FamilyTree from "./components/FamilyTree";
 import FamilyMembersPage from "./components/FamilyMember";
 import Relationships from "./components/Relationships";
+import Spouses from "./components/Spouses";
 import Userlist from "./components/Userlist";
 import Profile from "./components/Profile";
 import NotFound from "./components/NotFound";
@@ -80,6 +81,7 @@ const App = () => {
           <Route path="/familytree" element={<FamilyTree />} />
           <Route path="/familymembers" element={<FamilyMembersPage />} />
           <Route path="/relationships" element={<Relationships />} />
+          <Route path="/spouses" element={<Spouses />} />
           <Route path="/userlist" element={<Userlist />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />
