@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
-import { API_URL } from "../shared";
-import "../styles/AuthStyles.css";  // Instead of LoginStyles.css
+import { API_URL, resetCsrfToken } from "../shared";
+import "../styles/AuthStyles.css";
 
 const Login = ({ setUser }) => {
   const [formData, setFormData] = useState({
@@ -33,36 +33,39 @@ const Login = ({ setUser }) => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!validateForm()) {
-    return;
-  }
-
-  setIsLoading(true);
-  try {
-    const response = await axios.post(`${API_URL}/auth/login`, formData, {
-      withCredentials: true,
-    });
-
-    // ADD THESE LINES:
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
-      console.log("✅ Token saved to localStorage");
+    if (!validateForm()) {
+      return;
     }
 
-    setUser(response.data.user);
-    navigate("/familytree");
-  } catch (error) {
-    if (error.response?.data?.error) {
-      setErrors({ general: error.response.data.error });
-    } else {
-      setErrors({ general: "An error occurred during login" });
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/auth/login`, formData, {
+        withCredentials: true,
+      });
+
+      if (response.data.token) {
+        localStorage.setItem("token", response.data.token);
+        console.log("✅ Token saved to localStorage");
+      }
+
+      // Reset the cached CSRF token so the next mutating request fetches a
+      // fresh one that belongs to this new authenticated session.
+      resetCsrfToken();
+
+      setUser(response.data.user);
+      navigate("/familytree");
+    } catch (error) {
+      if (error.response?.data?.error) {
+        setErrors({ general: error.response.data.error });
+      } else {
+        setErrors({ general: "An error occurred during login" });
+      }
+    } finally {
+      setIsLoading(false);
     }
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;

@@ -13,7 +13,7 @@ import Relationships from "./components/Relationships";
 import Userlist from "./components/Userlist";
 import Profile from "./components/Profile";
 import NotFound from "./components/NotFound";
-import { API_URL, SOCKETS_URL, NODE_ENV } from "./shared";
+import { API_URL, SOCKETS_URL, NODE_ENV, resetCsrfToken } from "./shared";
 import { io } from "socket.io-client";
 
 const socket = io(SOCKETS_URL, {
@@ -30,26 +30,26 @@ const App = () => {
   }, []);
 
   const checkAuth = async () => {
-  const token = localStorage.getItem('token');
-  
-  if (!token) {
-    console.log("No token found");
-    setUser(null);
-    return;
-  }
+    const token = localStorage.getItem("token");
 
-  try {
-    const response = await axios.get(`${API_URL}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    console.log("✅ Auth check response:", response.data);
-    setUser(response.data); // Not response.data.user - your backend returns the user directly
-  } catch (error) {
-    console.log("❌ Auth check failed:", error);
-    setUser(null);
-    localStorage.removeItem('token'); // Clear invalid token
-  }
-};
+    if (!token) {
+      console.log("No token found");
+      setUser(null);
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      console.log("✅ Auth check response:", response.data);
+      setUser(response.data);
+    } catch (error) {
+      console.log("❌ Auth check failed:", error);
+      setUser(null);
+      localStorage.removeItem("token");
+    }
+  };
 
   // Check authentication status on app load
   useEffect(() => {
@@ -57,17 +57,24 @@ const App = () => {
   }, []);
 
   const handleLogout = async () => {
-  try {
-    localStorage.removeItem('token');
-    setUser(null);
-    // Optional: call backend logout if you have one
-    await axios.post(`${API_URL}/auth/logout`, {}, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-  } catch (error) {
-    console.error("Logout error:", error);
-  }
-};
+    try {
+      const token = localStorage.getItem("token"); // ✅ read token BEFORE removing it
+
+      // Call backend logout first while we still have the token
+      await axios.post(
+        `${API_URL}/auth/logout`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      // Always clear local state regardless of whether the backend call succeeded
+      localStorage.removeItem("token");
+      resetCsrfToken(); // ✅ clear cached CSRF token so next login gets a fresh one
+      setUser(null);
+    }
+  };
 
   return (
     <div>

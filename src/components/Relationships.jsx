@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { API_URL } from "../shared";
+import { API_URL, apiFetch } from "../shared";
 import "../styles/FamilyMembers.css";
 import "../styles/Relationships.css";
 
@@ -22,7 +22,7 @@ const Relationships = () => {
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         alert("You must be logged in to view this page.");
         navigate("/login");
@@ -55,20 +55,14 @@ const Relationships = () => {
   const fetchData = async () => {
     try {
       const [relRes, spouseRes, membersRes] = await Promise.all([
-        axios.get(`${API_URL}/api/relationships`, {
-          withCredentials: true,
-        }),
-        axios.get(`${API_URL}/api/spouses`, {
-          withCredentials: true,
-        }),
-        axios.get(`${API_URL}/api/familymembers`, {
-          withCredentials: true,
-        }),
+        apiFetch("/api/relationships"),
+        apiFetch("/api/spouses"),
+        apiFetch("/api/familymembers"),
       ]);
 
-      setRelationships(relRes.data);
-      setSpouses(spouseRes.data);
-      setFamilyMembers(membersRes.data);
+      setRelationships(await relRes.json());
+      setSpouses(await spouseRes.json());
+      setFamilyMembers(await membersRes.json());
     } catch (err) {
       console.error("Error fetching data:", err);
     }
@@ -78,32 +72,18 @@ const Relationships = () => {
   const handleParentChange = (parentId) => {
     const currentIds = parentChildForm.parent_ids;
     if (currentIds.includes(parentId)) {
-      setParentChildForm({
-        ...parentChildForm,
-        parent_ids: currentIds.filter(id => id !== parentId),
-        child_ids: []
-      });
+      setParentChildForm({ ...parentChildForm, parent_ids: currentIds.filter(id => id !== parentId), child_ids: [] });
     } else {
-      setParentChildForm({
-        ...parentChildForm,
-        parent_ids: [parentId],
-        child_ids: []
-      });
+      setParentChildForm({ ...parentChildForm, parent_ids: [parentId], child_ids: [] });
     }
   };
 
   const handleChildCheckbox = (childId) => {
     const currentIds = parentChildForm.child_ids;
     if (currentIds.includes(childId)) {
-      setParentChildForm({
-        ...parentChildForm,
-        child_ids: currentIds.filter(id => id !== childId)
-      });
+      setParentChildForm({ ...parentChildForm, child_ids: currentIds.filter(id => id !== childId) });
     } else {
-      setParentChildForm({
-        ...parentChildForm,
-        child_ids: [...currentIds, childId]
-      });
+      setParentChildForm({ ...parentChildForm, child_ids: [...currentIds, childId] });
     }
   };
 
@@ -118,19 +98,20 @@ const Relationships = () => {
 
     try {
       if (editRel) {
-        await axios.put(
-          `${API_URL}/api/relationships/${editRel.parent_id}/${editRel.child_id}`,
-          { parent_id: parent_ids[0], child_id: child_ids[0] },
-          { withCredentials: true }
+        await apiFetch(
+          `/api/relationships/${editRel.parent_id}/${editRel.child_id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({ parent_id: parent_ids[0], child_id: child_ids[0] }),
+          }
         );
         setEditRel(null);
       } else {
         for (const childId of child_ids) {
-          await axios.post(
-            `${API_URL}/api/relationships`,
-            { parent_id: parent_ids[0], child_id: childId },
-            { withCredentials: true }
-          );
+          await apiFetch("/api/relationships", {
+            method: "POST",
+            body: JSON.stringify({ parent_id: parent_ids[0], child_id: childId }),
+          });
         }
       }
       setParentChildForm({ parent_ids: [], child_ids: [] });
@@ -139,7 +120,7 @@ const Relationships = () => {
       fetchData();
     } catch (err) {
       console.error("Error saving relationship:", err);
-      alert(err.response?.data?.error || "Error saving relationship");
+      alert("Error saving relationship");
     }
   };
 
@@ -160,24 +141,25 @@ const Relationships = () => {
 
     try {
       if (editSpouse) {
-        await axios.put(
-          `${API_URL}/api/spouses/${editSpouse.partner1_id}/${editSpouse.partner2_id}`,
-          { partner1_id, partner2_id },
-          { withCredentials: true }
+        await apiFetch(
+          `/api/spouses/${editSpouse.partner1_id}/${editSpouse.partner2_id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({ partner1_id, partner2_id }),
+          }
         );
         setEditSpouse(null);
       } else {
-        await axios.post(
-          `${API_URL}/api/spouses`,
-          { partner1_id, partner2_id },
-          { withCredentials: true }
-        );
+        await apiFetch("/api/spouses", {
+          method: "POST",
+          body: JSON.stringify({ partner1_id, partner2_id }),
+        });
       }
       setSpouseForm({ partner1_id: "", partner2_id: "" });
       fetchData();
     } catch (err) {
       console.error("Error saving spouse relationship:", err);
-      alert(err.response?.data?.error || "Error saving spouse relationship");
+      alert("Error saving spouse relationship");
     }
   };
 
@@ -193,11 +175,8 @@ const Relationships = () => {
 
   const handleDeleteRel = async (parent_id, child_id) => {
     if (!window.confirm("Delete this relationship?")) return;
-
     try {
-      await axios.delete(`${API_URL}/api/relationships/${parent_id}/${child_id}`, {
-        withCredentials: true,
-      });
+      await apiFetch(`/api/relationships/${parent_id}/${child_id}`, { method: "DELETE" });
       fetchData();
     } catch (err) {
       console.error("Error deleting relationship:", err);
@@ -207,11 +186,8 @@ const Relationships = () => {
 
   const handleDeleteSpouse = async (partner1_id, partner2_id) => {
     if (!window.confirm("Delete this spouse relationship?")) return;
-
     try {
-      await axios.delete(`${API_URL}/api/spouses/${partner1_id}/${partner2_id}`, {
-        withCredentials: true,
-      });
+      await apiFetch(`/api/spouses/${partner1_id}/${partner2_id}`, { method: "DELETE" });
       fetchData();
     } catch (err) {
       console.error("Error deleting spouse relationship:", err);
@@ -230,186 +206,52 @@ const Relationships = () => {
   return (
     <div className="family-container">
       {/* Tabs */}
-      <div style={{
-        display: "flex",
-        gap: "10px",
-        marginBottom: "2rem",
-        borderBottom: "2px solid #ddd",
-      }}>
+      <div className="relationship-tabs">
         <button
           onClick={() => setActiveTab("parentChild")}
-          style={{
-            padding: "10px 20px",
-            backgroundColor: activeTab === "parentChild" ? "#28a745" : "#f0f0f0",
-            color: activeTab === "parentChild" ? "white" : "#333",
-            border: "none",
-            borderRadius: "6px 6px 0 0",
-            cursor: "pointer",
-            fontWeight: "bold",
-            fontSize: "16px",
-          }}
+          className={`relationship-tab-btn${activeTab === "parentChild" ? " active" : ""}`}
         >
           Parent-Child
         </button>
         <button
           onClick={() => setActiveTab("spouse")}
-          style={{
-            padding: "10px 20px",
-            backgroundColor: activeTab === "spouse" ? "#28a745" : "#f0f0f0",
-            color: activeTab === "spouse" ? "white" : "#333",
-            border: "none",
-            borderRadius: "6px 6px 0 0",
-            cursor: "pointer",
-            fontWeight: "bold",
-            fontSize: "16px",
-          }}
+          className={`relationship-tab-btn${activeTab === "spouse" ? " active" : ""}`}
         >
           Spouse
         </button>
       </div>
 
       {/* Tab Content Container */}
-      <div style={{ minHeight: "800px" }}>
+      <div className="relationship-tab-content">
         {/* Parent-Child Tab */}
         {activeTab === "parentChild" && (
           <>
             <h2>{editRel ? "Edit Parent-Child Relationship" : "Add Parent-Child Relationship"}</h2>
-          <form onSubmit={handleParentChildSubmit} className="relationship-form">
-            <div className="form-row">
-              <div className="form-column">
-                <label>Parent:</label>
-                <input
-                  type="text"
-                  placeholder="Search parent..."
-                  value={parentSearch}
-                  onChange={(e) => setParentSearch(e.target.value)}
-                  list="parent-list"
-                  className="search-input-small"
-                />
-                <datalist id="parent-list">
-                  {filteredParents.map((member) => (
-                    <option key={member.id} value={`${member.firstname} ${member.lastname}`}>
-                      {member.id}
-                    </option>
-                  ))}
-                </datalist>
-                <select
-                  value={parentChildForm.parent_ids[0] || ""}
-                  onChange={(e) => handleParentChange(parseInt(e.target.value))}
-                >
-                  <option value="">Select parent</option>
-                  {filteredParents.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.firstname} {member.lastname}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-column">
-                <label>Child:</label>
-                <input
-                  type="text"
-                  placeholder="Search child..."
-                  value={childSearch}
-                  onChange={(e) => setChildSearch(e.target.value)}
-                  list="child-list"
-                  className="search-input-small"
-                />
-                <datalist id="child-list">
-                  {filteredChildren.map((member) => (
-                    <option key={member.id} value={`${member.firstname} ${member.lastname}`}>
-                      {member.id}
-                    </option>
-                  ))}
-                </datalist>
-                <select
-                  value={parentChildForm.child_ids[0] || ""}
-                  onChange={(e) => handleChildCheckbox(parseInt(e.target.value))}
-                >
-                  <option value="">Select child</option>
-                  {filteredChildren.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.firstname} {member.lastname}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <button type="submit" className="btn-primary">
-                {editRel ? "Update Relationship" : "Add Relationship"}
-              </button>
-              {editRel && (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => {
-                    setEditRel(null);
-                    setParentChildForm({ parent_ids: [], child_ids: [] });
-                    setParentSearch("");
-                    setChildSearch("");
-                  }}
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-
-          <h2>Parent-Child Relationships</h2>
-          {relationships.length === 0 ? (
-            <p className="no-results">No parent-child relationships yet</p>
-          ) : (
-            <ul className="family-list">
-              {relationships.map((rel) => {
-                const parent = familyMembers.find((m) => m.id === rel.parent_id);
-                const child = familyMembers.find((m) => m.id === rel.child_id);
-                return (
-                  <li key={`${rel.parent_id}-${rel.child_id}`} className="family-item">
-                    <span className="family-info">
-                      {parent?.firstname} {parent?.lastname} ➝ {child?.firstname} {child?.lastname}
-                    </span>
-                    <div className="family-actions">
-                      <button
-                        className="edit-btn"
-                        onClick={() => handleEditRel(rel)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="delete-btn"
-                        onClick={() => handleDeleteRel(rel.parent_id, rel.child_id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </>
-      )}
-
-      {/* Spouse Tab */}
-      {activeTab === "spouse" && (
-        <>
-          <h2>{editSpouse ? "Edit Spouse Relationship" : "Add Spouse Relationship"}</h2>
-          <form onSubmit={handleSpouseSubmit} className="family-form">
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%" }}>
-              <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: "200px" }}>
-                  <label htmlFor="partner1">Partner 1:</label>
+            <form onSubmit={handleParentChildSubmit} className="relationship-form">
+              <div className="form-row">
+                <div className="form-column">
+                  <label>Parent:</label>
+                  <input
+                    type="text"
+                    placeholder="Search parent..."
+                    value={parentSearch}
+                    onChange={(e) => setParentSearch(e.target.value)}
+                    list="parent-list"
+                    className="search-input-small"
+                  />
+                  <datalist id="parent-list">
+                    {filteredParents.map((member) => (
+                      <option key={member.id} value={`${member.firstname} ${member.lastname}`}>
+                        {member.id}
+                      </option>
+                    ))}
+                  </datalist>
                   <select
-                    id="partner1"
-                    value={spouseForm.partner1_id}
-                    onChange={(e) => setSpouseForm({ ...spouseForm, partner1_id: parseInt(e.target.value) })}
-                    className="filter-select"
+                    value={parentChildForm.parent_ids[0] || ""}
+                    onChange={(e) => handleParentChange(parseInt(e.target.value))}
                   >
-                    <option value="">Select partner 1</option>
-                    {familyMembers.map((member) => (
+                    <option value="">Select parent</option>
+                    {filteredParents.map((member) => (
                       <option key={member.id} value={member.id}>
                         {member.firstname} {member.lastname}
                       </option>
@@ -417,16 +259,29 @@ const Relationships = () => {
                   </select>
                 </div>
 
-                <div style={{ flex: 1, minWidth: "200px" }}>
-                  <label htmlFor="partner2">Partner 2:</label>
+                <div className="form-column">
+                  <label>Child:</label>
+                  <input
+                    type="text"
+                    placeholder="Search child..."
+                    value={childSearch}
+                    onChange={(e) => setChildSearch(e.target.value)}
+                    list="child-list"
+                    className="search-input-small"
+                  />
+                  <datalist id="child-list">
+                    {filteredChildren.map((member) => (
+                      <option key={member.id} value={`${member.firstname} ${member.lastname}`}>
+                        {member.id}
+                      </option>
+                    ))}
+                  </datalist>
                   <select
-                    id="partner2"
-                    value={spouseForm.partner2_id}
-                    onChange={(e) => setSpouseForm({ ...spouseForm, partner2_id: parseInt(e.target.value) })}
-                    className="filter-select"
+                    value={parentChildForm.child_ids[0] || ""}
+                    onChange={(e) => handleChildCheckbox(parseInt(e.target.value))}
                   >
-                    <option value="">Select partner 2</option>
-                    {familyMembers.map((member) => (
+                    <option value="">Select child</option>
+                    {filteredChildren.map((member) => (
                       <option key={member.id} value={member.id}>
                         {member.firstname} {member.lastname}
                       </option>
@@ -436,60 +291,138 @@ const Relationships = () => {
               </div>
 
               <div style={{ display: "flex", gap: "0.5rem" }}>
-                <button type="submit" className="family-form button" style={{ backgroundColor: "#28a745" }}>
-                  {editSpouse ? "Update Relationship" : "Add Relationship"}
+                <button type="submit" className="btn-primary">
+                  {editRel ? "Update Relationship" : "Add Relationship"}
                 </button>
-                {editSpouse && (
+                {editRel && (
                   <button
                     type="button"
-                    className="family-form button"
-                    style={{ backgroundColor: "#6c757d" }}
+                    className="btn-secondary"
                     onClick={() => {
-                      setEditSpouse(null);
-                      setSpouseForm({ partner1_id: "", partner2_id: "" });
+                      setEditRel(null);
+                      setParentChildForm({ parent_ids: [], child_ids: [] });
+                      setParentSearch("");
+                      setChildSearch("");
                     }}
                   >
                     Cancel
                   </button>
                 )}
               </div>
-            </div>
-          </form>
+            </form>
 
-          <h2>Spouse Relationships</h2>
-          {spouses.length === 0 ? (
-            <p className="no-results">No spouse relationships yet</p>
-          ) : (
-            <ul className="family-list">
-              {spouses.map((spouse) => {
-                const partner1 = familyMembers.find((m) => m.id === spouse.partner1_id);
-                const partner2 = familyMembers.find((m) => m.id === spouse.partner2_id);
-                return (
-                  <li key={`${spouse.partner1_id}-${spouse.partner2_id}`} className="family-item">
-                    <span className="family-info">
-                      {partner1?.firstname} {partner1?.lastname} ♥ {partner2?.firstname} {partner2?.lastname}
-                    </span>
-                    <div className="family-actions">
-                      <button
-                        className="edit-btn"
-                        onClick={() => handleEditSpouse(spouse)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="delete-btn"
-                        onClick={() => handleDeleteSpouse(spouse.partner1_id, spouse.partner2_id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </>
-      )}
+            <h2>Parent-Child Relationships</h2>
+            {relationships.length === 0 ? (
+              <p className="no-results">No parent-child relationships yet</p>
+            ) : (
+              <ul className="family-list">
+                {relationships.map((rel) => {
+                  const parent = familyMembers.find((m) => m.id === rel.parent_id);
+                  const child = familyMembers.find((m) => m.id === rel.child_id);
+                  return (
+                    <li key={`${rel.parent_id}-${rel.child_id}`} className="family-item">
+                      <span className="family-info">
+                        {parent?.firstname} {parent?.lastname} ➝ {child?.firstname} {child?.lastname}
+                      </span>
+                      <div className="family-actions">
+                        <button className="edit-btn" onClick={() => handleEditRel(rel)}>Edit</button>
+                        <button className="delete-btn" onClick={() => handleDeleteRel(rel.parent_id, rel.child_id)}>Delete</button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        )}
+
+        {/* Spouse Tab */}
+        {activeTab === "spouse" && (
+          <>
+            <h2>{editSpouse ? "Edit Spouse Relationship" : "Add Spouse Relationship"}</h2>
+            <form onSubmit={handleSpouseSubmit} className="family-form">
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%" }}>
+                <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: "200px" }}>
+                    <label htmlFor="partner1">Partner 1:</label>
+                    <select
+                      id="partner1"
+                      value={spouseForm.partner1_id}
+                      onChange={(e) => setSpouseForm({ ...spouseForm, partner1_id: parseInt(e.target.value) })}
+                      className="filter-select"
+                    >
+                      <option value="">Select partner 1</option>
+                      {familyMembers.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.firstname} {member.lastname}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: "200px" }}>
+                    <label htmlFor="partner2">Partner 2:</label>
+                    <select
+                      id="partner2"
+                      value={spouseForm.partner2_id}
+                      onChange={(e) => setSpouseForm({ ...spouseForm, partner2_id: parseInt(e.target.value) })}
+                      className="filter-select"
+                    >
+                      <option value="">Select partner 2</option>
+                      {familyMembers.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.firstname} {member.lastname}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button type="submit" className="family-form button" style={{ backgroundColor: "#28a745" }}>
+                    {editSpouse ? "Update Relationship" : "Add Relationship"}
+                  </button>
+                  {editSpouse && (
+                    <button
+                      type="button"
+                      className="family-form button"
+                      style={{ backgroundColor: "#6c757d" }}
+                      onClick={() => {
+                        setEditSpouse(null);
+                        setSpouseForm({ partner1_id: "", partner2_id: "" });
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </div>
+            </form>
+
+            <h2>Spouse Relationships</h2>
+            {spouses.length === 0 ? (
+              <p className="no-results">No spouse relationships yet</p>
+            ) : (
+              <ul className="family-list">
+                {spouses.map((spouse) => {
+                  const partner1 = familyMembers.find((m) => m.id === spouse.partner1_id);
+                  const partner2 = familyMembers.find((m) => m.id === spouse.partner2_id);
+                  return (
+                    <li key={`${spouse.partner1_id}-${spouse.partner2_id}`} className="family-item">
+                      <span className="family-info">
+                        {partner1?.firstname} {partner1?.lastname} ♥ {partner2?.firstname} {partner2?.lastname}
+                      </span>
+                      <div className="family-actions">
+                        <button className="edit-btn" onClick={() => handleEditSpouse(spouse)}>Edit</button>
+                        <button className="delete-btn" onClick={() => handleDeleteSpouse(spouse.partner1_id, spouse.partner2_id)}>Delete</button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

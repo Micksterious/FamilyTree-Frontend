@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import "../styles/AuthStyles.css";
-import { API_URL } from "../shared";
+import { API_URL, resetCsrfToken } from "../shared";
 
 const Signup = ({ setUser }) => {
   const [formData, setFormData] = useState({
@@ -56,11 +56,15 @@ const Signup = ({ setUser }) => {
         `${API_URL}/auth/signup`,
         {
           username: formData.username,
-          email: formData.email, // ⬅️ send email
+          email: formData.email,
           password: formData.password,
         },
-        { withCredentials: true } // ⬅️ so the httpOnly cookie is set
+        { withCredentials: true }
       );
+
+      // Reset the cached CSRF token so the next mutating request fetches a
+      // fresh one that belongs to this new authenticated session.
+      resetCsrfToken();
 
       setUser(res.data.user);
       navigate("/");
