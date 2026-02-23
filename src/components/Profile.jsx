@@ -4,6 +4,21 @@ import { useNavigate } from "react-router-dom";
 import { API_URL } from "../shared";
 import "../styles/Profile.css";
 
+// ─── Image URL sanitizer ──────────────────────────────────────────────────────
+// Snyk CWE-79: picturePreview flows into <img src> from both FileReader output
+// and server responses. We allowlist only safe URL schemes before rendering.
+// - data:image/* — produced by FileReader.readAsDataURL() for local file picks
+// - https://    — server-hosted profile pictures
+// - /           — relative paths served by our own backend
+// Anything else (e.g. javascript:, data:text/html) is blocked.
+const SAFE_IMAGE_PATTERN = /^(data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,|https:\/\/|\/)/i;
+
+function sanitizeImageUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  return SAFE_IMAGE_PATTERN.test(url) ? url : null;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const Profile = ({ user }) => {
   const navigate = useNavigate();
   const [profileData, setProfileData] = useState(null);
@@ -38,7 +53,8 @@ const Profile = ({ user }) => {
       });
 
       setProfileData(response.data);
-      setPicturePreview(response.data.profilePicture || null);
+      // Sanitize URL from server before storing in state
+      setPicturePreview(sanitizeImageUrl(response.data.profilePicture) || null);
       setFormData({
         username: response.data.username || "",
         email: response.data.email || "",
@@ -61,33 +77,28 @@ const Profile = ({ user }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handlePictureChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith("image/")) {
         setMessage({ type: "error", text: "Please select an image file" });
         return;
       }
-      
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setMessage({ type: "error", text: "Image size must be less than 5MB" });
         return;
       }
 
       setProfilePicture(file);
-      
-      // Create preview
+
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPicturePreview(reader.result);
+        // FileReader always produces data:image/...;base64,... — sanitize anyway
+        // so the same code path is safe regardless of future changes
+        setPicturePreview(sanitizeImageUrl(reader.result) || null);
       };
       reader.readAsDataURL(file);
     }
@@ -102,58 +113,50 @@ const Profile = ({ user }) => {
     e.preventDefault();
     setMessage({ type: "", text: "" });
 
-    // Validate passwords if trying to change password
     if (formData.newPassword) {
       if (formData.newPassword !== formData.confirmPassword) {
         setMessage({ type: "error", text: "New passwords do not match" });
         return;
       }
       if (!formData.currentPassword) {
-        setMessage({ 
-          type: "error", 
-          text: "Current password is required to set a new password" 
-        });
+        setMessage({ type: "error", text: "Current password is required to set a new password" });
         return;
       }
       if (formData.newPassword.length < 6) {
-        setMessage({ 
-          type: "error", 
-          text: "New password must be at least 6 characters" 
-        });
+        setMessage({ type: "error", text: "New password must be at least 6 characters" });
         return;
       }
     }
 
     try {
       const token = localStorage.getItem("token");
-      
-      // Use FormData to handle file upload
+
       const submitData = new FormData();
-      submitData.append('username', formData.username);
-      submitData.append('email', formData.email);
-      
+      submitData.append("username", formData.username);
+      submitData.append("email", formData.email);
+
       if (formData.newPassword) {
-        submitData.append('currentPassword', formData.currentPassword);
-        submitData.append('newPassword', formData.newPassword);
+        submitData.append("currentPassword", formData.currentPassword);
+        submitData.append("newPassword", formData.newPassword);
       }
-      
       if (profilePicture) {
-        submitData.append('profilePicture', profilePicture);
+        submitData.append("profilePicture", profilePicture);
       }
 
-      const response = await axios.put(
-        `${API_URL}/auth/profile`, 
-        submitData,
-        {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          },
-        }
-      );
+      const response = await axios.put(`${API_URL}/auth/profile`, submitData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       setProfileData(response.data);
-      setPicturePreview(response.data.profilePicture || picturePreview);
+      // Sanitize URL returned from server after update
+      setPicturePreview(
+        sanitizeImageUrl(response.data.profilePicture) ||
+        sanitizeImageUrl(picturePreview) ||
+        null
+      );
       setProfilePicture(null);
       setIsEditing(false);
       setFormData((prev) => ({
@@ -163,11 +166,8 @@ const Profile = ({ user }) => {
         confirmPassword: "",
       }));
       setMessage({ type: "success", text: "Profile updated successfully!" });
-      
-      // Auto-hide success message after 3 seconds
-      setTimeout(() => {
-        setMessage({ type: "", text: "" });
-      }, 3000);
+
+      setTimeout(() => setMessage({ type: "", text: "" }), 3000);
     } catch (error) {
       console.error("Error updating profile:", error);
       setMessage({
@@ -180,7 +180,7 @@ const Profile = ({ user }) => {
   const handleCancel = () => {
     setIsEditing(false);
     setProfilePicture(null);
-    setPicturePreview(profileData?.profilePicture || null);
+    setPicturePreview(sanitizeImageUrl(profileData?.profilePicture) || null);
     setFormData({
       username: profileData.username || "",
       email: profileData.email || "",
@@ -201,6 +201,9 @@ const Profile = ({ user }) => {
     );
   }
 
+  // Safe URL ready for rendering — null means show initials placeholder instead
+  const safePreviewUrl = sanitizeImageUrl(picturePreview);
+
   return (
     <div className="profile-container">
       <div className="profile-card">
@@ -208,10 +211,10 @@ const Profile = ({ user }) => {
 
         <div className="profile-header">
           <div className="profile-picture-section">
-            {picturePreview ? (
-              <img 
-                src={picturePreview} 
-                alt="Profile" 
+            {safePreviewUrl ? (
+              <img
+                src={safePreviewUrl}
+                alt="Profile"
                 className="profile-picture"
               />
             ) : (
@@ -221,10 +224,10 @@ const Profile = ({ user }) => {
             )}
             {isEditing && (
               <>
-                <button 
+                <button
                   type="button"
                   className="change-picture-btn"
-                  onClick={() => document.getElementById('picture-input').click()}
+                  onClick={() => document.getElementById("picture-input").click()}
                 >
                   📷
                 </button>
@@ -272,7 +275,6 @@ const Profile = ({ user }) => {
                 </span>
               </div>
             </div>
-
             <button onClick={() => setIsEditing(true)} className="edit-btn">
               Edit Profile
             </button>
@@ -281,7 +283,7 @@ const Profile = ({ user }) => {
           <form onSubmit={handleSubmit} className="profile-form">
             <div className="form-section">
               <h3>Account Information</h3>
-              
+
               <div className="form-group">
                 <label htmlFor="username">Username:</label>
                 <input
@@ -312,7 +314,7 @@ const Profile = ({ user }) => {
             <div className="form-section password-section">
               <h3>Change Password</h3>
               <p className="section-note">Leave blank to keep current password</p>
-              
+
               <div className="form-group">
                 <label htmlFor="currentPassword">Current Password:</label>
                 <input
@@ -354,12 +356,8 @@ const Profile = ({ user }) => {
             </div>
 
             <div className="button-group">
-              <button type="submit" className="save-btn">
-                Save Changes
-              </button>
-              <button type="button" onClick={handleCancel} className="cancel-btn">
-                Cancel
-              </button>
+              <button type="submit" className="save-btn">Save Changes</button>
+              <button type="button" onClick={handleCancel} className="cancel-btn">Cancel</button>
             </div>
           </form>
         )}
