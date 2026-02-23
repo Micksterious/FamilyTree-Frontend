@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import FamilyTreeLayout from "./FamilyTreeLayout";
 import { API_URL } from "../shared";
 
-function FamilyTree() {
+function FamilyTree({ user }) {
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,11 +37,7 @@ function FamilyTree() {
     checkAuth();
   }, [navigate]);
 
-  return (
-    <>
-      <FamilyTreeLayout />
-    </>
-  );
+  return <FamilyTreeLayout user={user} />;
 }
 
 export default FamilyTree;

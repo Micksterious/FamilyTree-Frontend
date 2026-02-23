@@ -2,11 +2,11 @@ import React from "react";
 import FamilyTreeVisualization from "./FamilyTreeVisualization";
 import "../styles/FamilyTreeLayout.css";
 
-const FamilyTreeLayout = () => {
+const FamilyTreeLayout = ({ user }) => {
   return (
     <div className="family-tree-layout">
       <div className="tree-section">
-        <FamilyTreeVisualization />
+        <FamilyTreeVisualization user={user} />
       </div>
     </div>
   );

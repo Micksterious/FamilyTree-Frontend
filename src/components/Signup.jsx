@@ -10,6 +10,7 @@ const Signup = ({ setUser }) => {
     email: "",
     password: "",
     confirmPassword: "",
+    familyMemberCode: "",
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -58,6 +59,7 @@ const Signup = ({ setUser }) => {
           username: formData.username,
           email: formData.email,
           password: formData.password,
+          familyMemberCode: formData.familyMemberCode || undefined,
         },
         { withCredentials: true }
       );
@@ -159,6 +161,21 @@ const Signup = ({ setUser }) => {
             )}
           </div>
 
+          <div className="form-group">
+            <label htmlFor="familyMemberCode">Family Member Code (optional):</label>
+            <input
+              type="text"
+              id="familyMemberCode"
+              name="familyMemberCode"
+              value={formData.familyMemberCode}
+              onChange={handleChange}
+              className={errors.familyMemberCode ? "error" : ""}
+              autoComplete="off"
+            />
+            {errors.familyMemberCode && (
+              <span className="error-text">{errors.familyMemberCode}</span>
+            )}
+          </div>
           <button type="submit" disabled={isLoading}>
             {isLoading ? "Creating account..." : "Sign Up"}
           </button>

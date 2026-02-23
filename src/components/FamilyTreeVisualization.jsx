@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import RelationPopup from "./RelationPopup";
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
 import dagre from "cytoscape-dagre";
@@ -8,13 +9,83 @@ import "../styles/FamilyTreeVisualization.css";
 
 cytoscape.use(dagre);
 
-const FamilyTreeVisualization = () => {
+const FamilyTreeVisualization = ({ user }) => {
   const [cy, setCy] = useState(null);
   const [elements, setElements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showParentChild, setShowParentChild] = useState(true);
   const [showSpouses, setShowSpouses] = useState(true);
+  const [showCousin1, setShowCousin1] = useState(true);
+  const [showCousin2, setShowCousin2] = useState(true);
+  const [showCousin3, setShowCousin3] = useState(true);
+  const [userFamilyMemberId, setUserFamilyMemberId] = useState(null);
+  const [popup, setPopup] = useState(null);
+
+  // Fetch familyMemberId from /api/users/me using the authenticated user's id.
+  // We do this separately from the JWT payload because familyMemberId is stored
+  // in the DB, not encoded in the token.
+// Before (remove this entire block):
+useEffect(() => {
+  const fetchFamilyMemberId = async () => {
+    if (!user) return;
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const response = await axios.get(`${API_URL}/api/users/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setUserFamilyMemberId(response.data.familyMemberId);
+    } catch (e) {
+      console.error("Could not fetch familyMemberId:", e);
+      setUserFamilyMemberId(null);
+    }
+  };
+  fetchFamilyMemberId();
+  console.log("👤 user prop:", user);
+  console.log("🆔 familyMemberId:", user?.familyMemberId);
+}, [user]);
+
+// After (replace with this):
+useEffect(() => {
+  if (user?.familyMemberId) {
+    setUserFamilyMemberId(user.familyMemberId);
+  }
+}, [user]);
+
+  // Hover logic for user's own node
+  useEffect(() => {
+    if (!cy || !userFamilyMemberId) return;
+    let popupTimeout = null;
+    const handler = (event) => {
+  const node = event.target;
+  console.log("🖱️ hovered node id:", String(node.id()));
+  console.log("🆔 userFamilyMemberId:", String(userFamilyMemberId));
+  console.log("✅ match:", String(node.id()) === `member-${userFamilyMemberId}`);
+  if (String(node.id()) === `member-${userFamilyMemberId}`) {
+  const pos = node.renderedPosition();
+  console.log("🎉 MATCH FOUND, setting popup at:", pos);
+  setPopup({
+    x: pos.x,
+    y: pos.y,
+    name: node.data('firstname') + ' ' + node.data('lastname'),
+    relation: 'profile',
+  });
+}
+};
+    const outHandler = (event) => {
+  if (String(event.target.id()) === `member-${userFamilyMemberId}`) {
+    popupTimeout = setTimeout(() => setPopup(null), 100);
+  }
+};
+    cy.on('mouseover', 'node', handler);
+    cy.on('mouseout', 'node', outHandler);
+    return () => {
+      cy.off('mouseover', 'node', handler);
+      cy.off('mouseout', 'node', outHandler);
+      if (popupTimeout) clearTimeout(popupTimeout);
+    };
+  }, [cy, userFamilyMemberId]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "";
@@ -80,26 +151,19 @@ const FamilyTreeVisualization = () => {
 
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      // Group nodes by generation (Y position) instead of just by parents
       const generationGroups = new Map();
 
       cy.nodes().forEach(node => {
         const parents = cy.edges(`[target = "${node.id()}"]`).sources();
-        
-        if (parents.length === 0) return; // Skip root nodes (grandparents)
-
-        // Round Y position to group nodes in same generation
+        if (parents.length === 0) return;
         const generation = Math.round(node.position().y / 100);
-        
         if (!generationGroups.has(generation)) {
           generationGroups.set(generation, []);
         }
         generationGroups.get(generation).push(node);
       });
 
-      // For each generation, group by shared parents (including half-siblings)
       generationGroups.forEach(nodesInGeneration => {
-        // Find groups of siblings/half-siblings (those who share at least one parent)
         const processed = new Set();
         const siblingGroups = [];
 
@@ -111,15 +175,12 @@ const FamilyTreeVisualization = () => {
 
           const nodeParents = cy.edges(`[target = "${node.id()}"]`).sources().map(p => p.id());
 
-          // Find all other nodes that share at least one parent
           nodesInGeneration.forEach(otherNode => {
             if (processed.has(otherNode.id())) return;
 
             const otherParents = cy.edges(`[target = "${otherNode.id()}"]`).sources().map(p => p.id());
-            
-            // Check if they share at least one parent
             const sharedParents = nodeParents.filter(p => otherParents.includes(p));
-            
+
             if (sharedParents.length > 0) {
               group.push(otherNode);
               processed.add(otherNode.id());
@@ -131,22 +192,18 @@ const FamilyTreeVisualization = () => {
           }
         });
 
-        // Sort and reposition each sibling group
         siblingGroups.forEach(siblings => {
           if (siblings.length <= 1) return;
 
-          // Sort by birth date (oldest first)
           siblings.sort((a, b) => {
             const dateA = new Date(a.data('birthDate') || '9999-12-31');
             const dateB = new Date(b.data('birthDate') || '9999-12-31');
             return dateA - dateB;
           });
 
-          // Get all X positions sorted
           const xPositions = siblings.map(s => s.position().x).sort((a, b) => a - b);
           const avgY = siblings.reduce((sum, s) => sum + s.position().y, 0) / siblings.length;
 
-          // Assign positions left to right by age
           siblings.forEach((node, index) => {
             node.position({ x: xPositions[index], y: avgY });
           });
@@ -212,7 +269,6 @@ const FamilyTreeVisualization = () => {
     },
   ];
 
-  // Filter elements based on visibility toggles
   const filteredElements = elements.filter(el => {
     if (el.data?.type === "parent-child" && !showParentChild) return false;
     if (el.data?.type === "spouse" && !showSpouses) return false;
@@ -220,7 +276,7 @@ const FamilyTreeVisualization = () => {
   });
 
   return (
-    <div className="tree-container">
+    <div className="tree-container" style={{position: 'relative'}}>
       {/* Legend */}
       <div style={{
         position: "absolute",
@@ -267,19 +323,60 @@ const FamilyTreeVisualization = () => {
           <div style={{ width: "30px", height: "3px", backgroundColor: "#E84C9F", backgroundImage: "repeating-linear-gradient(90deg, #E84C9F 0px, #E84C9F 5px, white 5px, white 10px)" }} />
           <span>Spouse</span>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
+          <input
+            type="checkbox"
+            checked={showCousin1}
+            onChange={e => setShowCousin1(e.target.checked)}
+            style={{ cursor: "pointer" }}
+          />
+          <div style={{ width: "30px", height: "3px", backgroundColor: "#FFD700" }} />
+          <span>1st Cousin</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "5px" }}>
+          <input
+            type="checkbox"
+            checked={showCousin2}
+            onChange={e => setShowCousin2(e.target.checked)}
+            style={{ cursor: "pointer" }}
+          />
+          <div style={{ width: "30px", height: "3px", backgroundColor: "#40E0D0" }} />
+          <span>2nd Cousin</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "5px" }}>
+          <input
+            type="checkbox"
+            checked={showCousin3}
+            onChange={e => setShowCousin3(e.target.checked)}
+            style={{ cursor: "pointer" }}
+          />
+          <div style={{ width: "30px", height: "3px", backgroundColor: "#FF69B4" }} />
+          <span>3rd Cousin</span>
+        </div>
       </div>
 
       {elements.length > 0 ? (
-        <CytoscapeComponent
-          elements={filteredElements}
-          style={{
-            width: "100%",
-            height: "calc(100vh - 80px)",
-          }}
-          stylesheet={cytoStyle}
-          cy={(cyInstance) => setCy(cyInstance)}
-          autoungrabify={false}
-        />
+        <>
+          <CytoscapeComponent
+            elements={filteredElements}
+            style={{ width: "100%", height: "calc(100vh - 80px)" }}
+            stylesheet={cytoStyle}
+            cy={(cyInstance) => setCy(cyInstance)}
+            autoungrabify={false}
+          />
+          {popup && (
+  <div style={{
+    position: 'fixed',
+    left: popup.x + 30,
+    top: popup.y - 30,
+    pointerEvents: 'none',
+    zIndex: 9999,
+  }}>
+    {console.log("🎨 rendering popup:", popup)}
+    <RelationPopup name={popup.name} relation={"profile"} />
+  </div>
+)}
+        </>
       ) : (
         <div>No family members to display</div>
       )}

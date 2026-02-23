@@ -84,7 +84,7 @@ const App = () => {
           <Route path="/login" element={<Login setUser={setUser} />} />
           <Route path="/signup" element={<Signup setUser={setUser} />} />
           <Route exact path="/" element={<Home />} />
-          <Route path="/familytree" element={<FamilyTree />} />
+          <Route path="/familytree" element={<FamilyTree user={user} />} />
           <Route path="/familymembers" element={<FamilyMembersPage />} />
           <Route path="/relationships" element={<Relationships />} />
           <Route path="/userlist" element={<Userlist />} />

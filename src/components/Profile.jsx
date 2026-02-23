@@ -48,12 +48,12 @@ const Profile = ({ user }) => {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/auth/me`, {
+      // Fetch from /api/users/me to get familyMemberId
+      const response = await axios.get(`${API_URL}/api/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       setProfileData(response.data);
-      // Sanitize URL from server before storing in state
       setPicturePreview(sanitizeImageUrl(response.data.profilePicture) || null);
       setFormData({
         username: response.data.username || "",
@@ -257,6 +257,10 @@ const Profile = ({ user }) => {
               <div className="profile-field">
                 <label>Email:</label>
                 <span>{profileData?.email || "Not set"}</span>
+              </div>
+              <div className="profile-field">
+                <label>Family Member ID:</label>
+                <span>{profileData?.familyMemberId || "Not paired"}</span>
               </div>
               <div className="profile-field">
                 <label>Role:</label>
