@@ -138,79 +138,86 @@ useEffect(() => {
     if (!cy || elements.length === 0) return;
 
     const runLayout = async () => {
+      // Only run dagre on parent-child edges so spouse edges don't distort ranks
       const layout = cy.layout({
         name: "dagre",
-        nodeSep: 120,
-        rankSep: 180,
+        nodeSep: 130,
+        rankSep: 200,
         rankDir: "TB",
         ranker: "network-simplex",
         animate: false,
+        // Tell dagre to ignore spouse edges when computing ranks
+        edgeWeight: (edge) => edge.data('type') === 'spouse' ? 0 : 1,
       });
 
       layout.run();
-
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      const generationGroups = new Map();
+      // ── Step 1: Level spouses to the same Y ──────────────────────────────
+      // Walk spouse edges and average the Y of each pair, spreading
+      // transitively so chains (A─B─C) all land on the same row.
+      const spouseEdges = cy.edges('[type = "spouse"]');
+      const unionFind = {};
+      const find = (id) => {
+        if (unionFind[id] === undefined || unionFind[id] === id) {
+          unionFind[id] = id;
+          return id;
+        }
+        return (unionFind[id] = find(unionFind[id]));
+      };
+      const union = (a, b) => { unionFind[find(a)] = find(b); };
+
+      spouseEdges.forEach(e => union(e.source().id(), e.target().id()));
+
+      // Group nodes by their spouse-cluster root
+      const spouseClusters = new Map();
+      cy.nodes().forEach(node => {
+        const root = find(node.id());
+        if (!spouseClusters.has(root)) spouseClusters.set(root, []);
+        spouseClusters.get(root).push(node);
+      });
+
+      // For each multi-node cluster, align everyone to the minimum Y in the group
+      // (the shallowest / highest-up node wins so no one gets pushed down)
+      spouseClusters.forEach(nodes => {
+        if (nodes.length <= 1) return;
+        const minY = Math.min(...nodes.map(n => n.position().y));
+        nodes.forEach(n => n.position({ x: n.position().x, y: minY }));
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // ── Step 2: Snap every node to a clean generation row ────────────────
+      // Bucket by rounded Y, then assign evenly-spaced integer rows so the
+      // whole tree sits on perfectly horizontal bands.
+      const BAND = 200; // px between generations — matches rankSep
+      const rawYs = cy.nodes().map(n => n.position().y);
+      const sortedUniqueYs = [...new Set(rawYs.map(y => Math.round(y / 50) * 50))].sort((a, b) => a - b);
+
+      // Map each raw Y to the nearest snapped row index
+      const rowY = (rawY) => {
+        let closest = sortedUniqueYs[0];
+        let minDist = Math.abs(rawY - closest);
+        for (const sy of sortedUniqueYs) {
+          const d = Math.abs(rawY - sy);
+          if (d < minDist) { minDist = d; closest = sy; }
+        }
+        return sortedUniqueYs.indexOf(closest);
+      };
 
       cy.nodes().forEach(node => {
-        const parents = cy.edges(`[target = "${node.id()}"]`).sources();
-        if (parents.length === 0) return;
-        const generation = Math.round(node.position().y / 100);
-        if (!generationGroups.has(generation)) {
-          generationGroups.set(generation, []);
-        }
-        generationGroups.get(generation).push(node);
+        const rowIndex = rowY(node.position().y);
+        node.position({ x: node.position().x, y: rowIndex * BAND });
       });
 
-      generationGroups.forEach(nodesInGeneration => {
-        const processed = new Set();
-        const siblingGroups = [];
-
-        nodesInGeneration.forEach(node => {
-          if (processed.has(node.id())) return;
-
-          const group = [node];
-          processed.add(node.id());
-
-          const nodeParents = cy.edges(`[target = "${node.id()}"]`).sources().map(p => p.id());
-
-          nodesInGeneration.forEach(otherNode => {
-            if (processed.has(otherNode.id())) return;
-
-            const otherParents = cy.edges(`[target = "${otherNode.id()}"]`).sources().map(p => p.id());
-            const sharedParents = nodeParents.filter(p => otherParents.includes(p));
-
-            if (sharedParents.length > 0) {
-              group.push(otherNode);
-              processed.add(otherNode.id());
-            }
-          });
-
-          if (group.length > 0) {
-            siblingGroups.push(group);
-          }
-        });
-
-        siblingGroups.forEach(siblings => {
-          if (siblings.length <= 1) return;
-
-          siblings.sort((a, b) => {
-            const dateA = new Date(a.data('birthDate') || '9999-12-31');
-            const dateB = new Date(b.data('birthDate') || '9999-12-31');
-            return dateA - dateB;
-          });
-
-          const xPositions = siblings.map(s => s.position().x).sort((a, b) => a - b);
-          const avgY = siblings.reduce((sum, s) => sum + s.position().y, 0) / siblings.length;
-
-          siblings.forEach((node, index) => {
-            node.position({ x: xPositions[index], y: avgY });
-          });
-        });
+      // ── Step 3: Re-align spouses after row snapping ───────────────────────
+      spouseClusters.forEach(nodes => {
+        if (nodes.length <= 1) return;
+        const minY = Math.min(...nodes.map(n => n.position().y));
+        nodes.forEach(n => n.position({ x: n.position().x, y: minY }));
       });
 
-      cy.fit();
+      cy.fit(undefined, 40);
     };
 
     runLayout();
