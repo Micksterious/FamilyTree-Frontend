@@ -102,6 +102,66 @@ useEffect(() => {
     return label;
   };
 
+  // ── Couple-node injection ────────────────────────────────────────────────
+  // For each spouse pair, create a tiny invisible "couple node" placed between
+  // them. All parent-child edges that originated from either spouse are
+  // re-routed to come FROM the couple node. Classic look: horizontal spouse
+  // line with one drop-point in the middle, children branching straight down.
+  const injectCoupleNodes = (rawNodes, rawEdges) => {
+    const spouseEdges  = rawEdges.filter(e => e.data?.type === "spouse");
+    const pcEdges      = rawEdges.filter(e => e.data?.type === "parent-child");
+    const otherEdges   = rawEdges.filter(e => e.data?.type !== "spouse" && e.data?.type !== "parent-child");
+
+    // memberId -> Set of child ids
+    const childrenOf = new Map();
+    pcEdges.forEach(e => {
+      const p = String(e.data.source);
+      const c = String(e.data.target);
+      if (!childrenOf.has(p)) childrenOf.set(p, new Set());
+      childrenOf.get(p).add(c);
+    });
+
+    const coupleNodes   = [];
+    const coupleEdges   = [];
+    const coupleToChild = [];
+    const reRouted      = new Set(); // "parentId-childId" keys already handled
+
+    spouseEdges.forEach(spouseEdge => {
+      const p1       = String(spouseEdge.data.source);
+      const p2       = String(spouseEdge.data.target);
+      const coupleId = `couple-${p1}-${p2}`;
+
+      const p1Children = childrenOf.get(p1) || new Set();
+      const p2Children = childrenOf.get(p2) || new Set();
+
+      // Only children recorded under BOTH parents flow through the couple node.
+      // Half-siblings (only one parent in the DB) keep a direct arrow from
+      // whichever parent IS recorded — they are not re-routed here.
+      const sharedChildren = new Set([...p1Children].filter(c => p2Children.has(c)));
+
+      // Invisible couple node — always created so the spouse line has a midpoint
+      coupleNodes.push({ data: { id: coupleId, type: "couple", label: "" } });
+
+      // Each spouse connects TO the couple node (replaces the original spouse edge)
+      coupleEdges.push({ data: { id: `se-${p1}-${coupleId}`, source: p1, target: coupleId, type: "spouse" } });
+      coupleEdges.push({ data: { id: `se-${p2}-${coupleId}`, source: p2, target: coupleId, type: "spouse" } });
+
+      // Couple node -> shared children only
+      sharedChildren.forEach(childId => {
+        coupleToChild.push({
+          data: { id: `cc-${coupleId}-${childId}`, source: coupleId, target: childId, type: "parent-child" },
+        });
+        reRouted.add(`${p1}-${childId}`);
+        reRouted.add(`${p2}-${childId}`);
+      });
+    });
+
+    // Keep original parent-child edges only for parents with no spouse recorded
+    const remainingPc = pcEdges.filter(e => !reRouted.has(`${e.data.source}-${e.data.target}`));
+
+    return [...rawNodes, ...coupleNodes, ...coupleEdges, ...coupleToChild, ...remainingPc, ...otherEdges];
+  };
+
   useEffect(() => {
     const fetchFamilyTree = async () => {
       try {
@@ -122,7 +182,8 @@ useEffect(() => {
           }
         }));
 
-        setElements([...processedNodes, ...response.data.edges]);
+        const withCoupleNodes = injectCoupleNodes(processedNodes, response.data.edges);
+        setElements(withCoupleNodes);
         setLoading(false);
       } catch (err) {
         console.error("Error fetching family tree:", err);
@@ -138,7 +199,8 @@ useEffect(() => {
     if (!cy || elements.length === 0) return;
 
     const runLayout = async () => {
-      // Only run dagre on parent-child edges so spouse edges don't distort ranks
+      // Run dagre — couple nodes are tiny so they won't disrupt ranks much;
+      // spouse edges have zero weight so they don't affect vertical placement.
       const layout = cy.layout({
         name: "dagre",
         nodeSep: 130,
@@ -146,55 +208,18 @@ useEffect(() => {
         rankDir: "TB",
         ranker: "network-simplex",
         animate: false,
-        // Tell dagre to ignore spouse edges when computing ranks
         edgeWeight: (edge) => edge.data('type') === 'spouse' ? 0 : 1,
       });
 
       layout.run();
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      // ── Step 1: Level spouses to the same Y ──────────────────────────────
-      // Walk spouse edges and average the Y of each pair, spreading
-      // transitively so chains (A─B─C) all land on the same row.
-      const spouseEdges = cy.edges('[type = "spouse"]');
-      const unionFind = {};
-      const find = (id) => {
-        if (unionFind[id] === undefined || unionFind[id] === id) {
-          unionFind[id] = id;
-          return id;
-        }
-        return (unionFind[id] = find(unionFind[id]));
-      };
-      const union = (a, b) => { unionFind[find(a)] = find(b); };
-
-      spouseEdges.forEach(e => union(e.source().id(), e.target().id()));
-
-      // Group nodes by their spouse-cluster root
-      const spouseClusters = new Map();
-      cy.nodes().forEach(node => {
-        const root = find(node.id());
-        if (!spouseClusters.has(root)) spouseClusters.set(root, []);
-        spouseClusters.get(root).push(node);
-      });
-
-      // For each multi-node cluster, align everyone to the minimum Y in the group
-      // (the shallowest / highest-up node wins so no one gets pushed down)
-      spouseClusters.forEach(nodes => {
-        if (nodes.length <= 1) return;
-        const minY = Math.min(...nodes.map(n => n.position().y));
-        nodes.forEach(n => n.position({ x: n.position().x, y: minY }));
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // ── Step 2: Snap every node to a clean generation row ────────────────
-      // Bucket by rounded Y, then assign evenly-spaced integer rows so the
-      // whole tree sits on perfectly horizontal bands.
-      const BAND = 200; // px between generations — matches rankSep
-      const rawYs = cy.nodes().map(n => n.position().y);
+      // ── Step 1: Snap every NON-couple node to clean generation rows ───────
+      const BAND = 200;
+      const memberNodes = cy.nodes().filter(n => n.data('type') !== 'couple');
+      const rawYs = memberNodes.map(n => n.position().y);
       const sortedUniqueYs = [...new Set(rawYs.map(y => Math.round(y / 50) * 50))].sort((a, b) => a - b);
 
-      // Map each raw Y to the nearest snapped row index
       const rowY = (rawY) => {
         let closest = sortedUniqueYs[0];
         let minDist = Math.abs(rawY - closest);
@@ -205,16 +230,85 @@ useEffect(() => {
         return sortedUniqueYs.indexOf(closest);
       };
 
-      cy.nodes().forEach(node => {
+      memberNodes.forEach(node => {
         const rowIndex = rowY(node.position().y);
         node.position({ x: node.position().x, y: rowIndex * BAND });
       });
 
-      // ── Step 3: Re-align spouses after row snapping ───────────────────────
+      // ── Step 2: Align spouses to same Y (union-find on real member nodes) ─
+      const spouseEdges = cy.edges('[type = "spouse"]').filter(
+        e => e.source().data('type') !== 'couple' && e.target().data('type') !== 'couple'
+      );
+      const uf = {};
+      const find = (id) => {
+        if (!uf[id] || uf[id] === id) { uf[id] = id; return id; }
+        return (uf[id] = find(uf[id]));
+      };
+      const union = (a, b) => { uf[find(a)] = find(b); };
+      spouseEdges.forEach(e => union(e.source().id(), e.target().id()));
+
+      const spouseClusters = new Map();
+      memberNodes.forEach(node => {
+        const root = find(node.id());
+        if (!spouseClusters.has(root)) spouseClusters.set(root, []);
+        spouseClusters.get(root).push(node);
+      });
+
       spouseClusters.forEach(nodes => {
         if (nodes.length <= 1) return;
         const minY = Math.min(...nodes.map(n => n.position().y));
         nodes.forEach(n => n.position({ x: n.position().x, y: minY }));
+      });
+
+      // ── Step 3: Place each couple node exactly between its two spouses ────
+      cy.nodes('[type = "couple"]').forEach(coupleNode => {
+        const parents = coupleNode.connectedEdges('[type = "spouse"]')
+          .connectedNodes()
+          .filter(n => n.id() !== coupleNode.id());
+
+        if (parents.length === 2) {
+          const x1 = parents[0].position().x;
+          const x2 = parents[1].position().x;
+          const y  = parents[0].position().y;
+          coupleNode.position({ x: (x1 + x2) / 2, y });
+        } else if (parents.length === 1) {
+          coupleNode.position({ ...parents[0].position() });
+        }
+      });
+
+      // ── Step 4: Align half-siblings to their full-sibling row ─────────────
+      // A child may only have one parent recorded (half-sibling case). We find
+      // ALL children of each parent node and snap them to the same Y so that
+      // half-siblings appear on the same row as their full siblings.
+      const childYByParent = new Map(); // parentId -> best Y for their children
+
+      // First pass: find the dominant child-row Y for each parent
+      // (use the Y of children coming through a couple node as the reference)
+      cy.edges('[type = "parent-child"]').forEach(e => {
+        const src = e.source();
+        const tgt = e.target();
+        // Edges from couple nodes define the "official" child row for those parents
+        if (src.data('type') === 'couple') {
+          const coupleParents = src.connectedEdges('[type = "spouse"]')
+            .connectedNodes()
+            .filter(n => n.id() !== src.id());
+          coupleParents.forEach(p => {
+            const childY = tgt.position().y;
+            if (!childYByParent.has(p.id()) || childY < childYByParent.get(p.id())) {
+              childYByParent.set(p.id(), childY);
+            }
+          });
+        }
+      });
+
+      // Second pass: snap direct (non-couple) children to their parent's child row
+      cy.edges('[type = "parent-child"]').forEach(e => {
+        const src = e.source();
+        const tgt = e.target();
+        if (src.data('type') !== 'couple' && childYByParent.has(src.id())) {
+          const targetY = childYByParent.get(src.id());
+          tgt.position({ x: tgt.position().x, y: targetY });
+        }
       });
 
       cy.fit(undefined, 40);
@@ -248,6 +342,17 @@ useEffect(() => {
         "font-weight": "normal",
       },
     },
+    // Couple nodes: tiny filled dot, no label
+    {
+      selector: 'node[type="couple"]',
+      style: {
+        "background-color": "#555",
+        label: "",
+        width: 10,
+        height: 10,
+        "border-width": 0,
+      },
+    },
     {
       selector: "edge",
       style: {
@@ -255,7 +360,7 @@ useEffect(() => {
         "target-arrow-color": "#333",
         "line-color": "#333",
         width: 2,
-        "curve-style": "bezier",
+        "curve-style": "straight",
       },
     },
     {
@@ -263,7 +368,8 @@ useEffect(() => {
       style: {
         "target-arrow-shape": "none",
         "line-color": "#E84C9F",
-        "line-style": "dashed",
+        "line-style": "solid",
+        "curve-style": "straight",
         width: 3,
       },
     },
@@ -271,7 +377,10 @@ useEffect(() => {
       selector: 'edge[type="parent-child"]',
       style: {
         "target-arrow-shape": "triangle",
+        "target-arrow-color": "#333",
         "line-color": "#333",
+        "curve-style": "straight",
+        width: 2,
       },
     },
   ];
